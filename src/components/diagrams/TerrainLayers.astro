@@ -1,0 +1,144 @@
+---
+// ベース地形のレイヤー合成をドットで再現した図。
+// 各ドットは「外周までの距離」を持ち、レイヤーごとに距離範囲を正規化して閾値テクスチャと比較する。
+// 下のレイヤーから順に評価し、不透明と判定されたドットだけを上書きする（BaseTerrainDotInstancedPBR.shader）。
+const CELL = 12;
+const W = 480;
+const H = 228;
+const SURFACE = 24;
+
+// 閾値テクスチャの代わりに、なめらかな値ノイズを使う
+const hash = (x: number, y: number) => {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
+const noise = (x: number, y: number) => {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+};
+
+const layers = [
+  { cls: 'l1', start: 0, end: 132, scale: 0.18, seed: 3, ramp: false },
+  { cls: 'l2', start: 0, end: 54, scale: 0.35, seed: 11, ramp: true },
+];
+
+const cells: { x: number; y: number; cls: string; shade: number }[] = [];
+for (let y = SURFACE + CELL / 2; y < H; y += CELL) {
+  for (let x = CELL / 2; x < W; x += CELL) {
+    const dist = y - SURFACE;
+    let cls = 'l0';
+    let shade = 1;
+    for (const l of layers) {
+      if (dist < l.start || dist >= l.end) continue;
+      const n = (dist - l.start) / (l.end - l.start);
+      const t = 0.35 + 0.65 * noise(x * l.scale * 0.1 + l.seed, y * l.scale * 0.1);
+      if (n > t) continue;
+      cls = l.cls;
+      // ランプ：外周に近いほど明るく
+      shade = l.ramp ? 0.45 + 0.55 * (1 - Math.min(1, (dist - l.start) / t / (l.end - l.start))) : 1;
+    }
+    cells.push({ x, y, cls, shade });
+  }
+}
+---
+
+<figure class="layers">
+  <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="外周からの距離に応じて4層のレイヤーを重ねるベース地形の図">
+    {
+      cells.map((c) => (
+        <rect
+          x={c.x - CELL / 2}
+          y={c.y - CELL / 2}
+          width={CELL}
+          height={CELL}
+          class={c.cls}
+          style={c.cls === 'l2' ? `fill-opacity:${c.shade.toFixed(2)}` : undefined}
+        />
+      ))
+    }
+    <line x1="0" y1={SURFACE} x2={W} y2={SURFACE} class="surface" />
+    <text x="4" y={SURFACE - 8} class="label">外周（距離 0）</text>
+  </svg>
+  <ul class="legend mono">
+    <li><i class="l2"></i>Layer 2：外周付近。ランプでソフトライト合成</li>
+    <li><i class="l1"></i>Layer 1：中間。境界を閾値テクスチャで崩す</li>
+    <li><i class="l0"></i>Layer 0：ベース（距離無制限）</li>
+  </ul>
+  <figcaption class="mono">距離範囲・閾値・ランプをレイヤーごとに設定（最大4層、BaseTerrainRenderer.cs）</figcaption>
+</figure>
+
+<style>
+  .layers {
+    margin: 24px 0;
+    border: var(--line);
+    background: var(--bg);
+  }
+  svg {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 16px 16px 0;
+  }
+  rect {
+    stroke: var(--bg);
+    stroke-width: 0.5;
+  }
+  .l0 {
+    fill: var(--ink);
+  }
+  .l1 {
+    fill: var(--muted);
+  }
+  .l2 {
+    fill: var(--accent);
+  }
+  .surface {
+    stroke: var(--ink);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+  }
+  .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--ink);
+  }
+  .legend {
+    list-style: none;
+    margin: 0;
+    padding: 10px 16px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    font-size: 11px;
+    text-transform: none;
+  }
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend i {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--ink);
+  }
+  .legend i.l0 {
+    background: var(--ink);
+  }
+  .legend i.l1 {
+    background: var(--muted);
+  }
+  .legend i.l2 {
+    background: var(--accent);
+  }
+  figcaption {
+    border-top: var(--line);
+    padding: 6px 10px;
+    text-transform: none;
+  }
+</style>

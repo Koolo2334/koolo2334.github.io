@@ -1,0 +1,128 @@
+---
+interface Props {
+  n: string;
+  title: string;
+}
+
+const { n, title } = Astro.props;
+const hasResult = Astro.slots.has('result');
+---
+
+<section class="case">
+  <header>
+    <span class="mono no">Case {n}</span>
+    <h3>{title}</h3>
+  </header>
+  <div class="row">
+    <span class="mono label">課題</span>
+    <div class="body"><slot name="problem" /></div>
+  </div>
+  <div class="row">
+    <span class="mono label">解決</span>
+    <div class="body"><slot /></div>
+  </div>
+  {
+    hasResult && (
+      <div class="row result">
+        <span class="mono label">成果</span>
+        <div class="body"><slot name="result" /></div>
+      </div>
+    )
+  }
+</section>
+
+<style>
+  .case {
+    border: var(--line);
+    margin: 32px 0;
+    background: var(--paper);
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 10px 14px;
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .no {
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h3 {
+    font-family: var(--font-jp);
+    font-size: 17px;
+    line-height: 1.5;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    border-top: var(--line);
+  }
+  .label {
+    padding: 12px 0 0 14px;
+    color: var(--muted);
+    text-transform: none;
+  }
+  .body {
+    padding: 0 16px;
+    border-left: var(--hair);
+  }
+  .body > :global(*:first-child) {
+    margin-top: 12px;
+  }
+  .body > :global(*:last-child) {
+    margin-bottom: 12px;
+  }
+  /* 図とギャラリーは解決欄の左右いっぱいに広げる（直接の子だけ。ギャラリー内の画像には効かせない） */
+  .body > :global(figure),
+  .body > :global(.gallery) {
+    margin: 16px -16px;
+    border-inline: 0;
+  }
+  .body > :global(.gallery figure:nth-child(2n)) {
+    border-right: 0;
+  }
+  /* 最後のギャラリーは画像の下枠を次の行の枠線と重ねる */
+  .body > :global(.gallery:last-child) {
+    margin-bottom: -2px;
+  }
+  /* 前の図の下余白(16px)と相殺させ、枠線1本分だけ重ねる */
+  .body > :global(:is(figure, .gallery) + :is(figure, .gallery)),
+  .body > :global(:is(figure, .gallery) + script + :is(figure, .gallery)) {
+    margin-top: -18px;
+  }
+  .body > :global(:is(figure, .gallery):last-child),
+  .body > :global(:is(figure, .gallery):has(+ script:last-child)) {
+    margin-bottom: 0;
+    border-bottom: 0;
+  }
+  .result {
+    background: var(--accent);
+    color: #fff;
+  }
+  .result .label {
+    color: #fff;
+  }
+  .result .body {
+    border-left-color: #fff;
+    font-weight: 700;
+  }
+  .result :global(code) {
+    color: var(--ink);
+  }
+  @media (max-width: 560px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .label {
+      padding: 8px 14px 0;
+    }
+    .body {
+      border-left: 0;
+    }
+    .body > :global(*:first-child) {
+      margin-top: 4px;
+    }
+  }
+</style>

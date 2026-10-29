@@ -1,0 +1,368 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import Cover from '../components/Cover.astro';
+import { profile, skills, awards, certifications, others, hobbies } from '../data/site';
+
+const works = (await getCollection('works')).sort((a, b) => a.data.order - b.data.order);
+const main = works.filter((w) => w.data.tier === 'main');
+const sub = works.filter((w) => w.data.tier === 'sub');
+const base = import.meta.env.BASE_URL;
+const pad = (n: number) => String(n).padStart(2, '0');
+---
+
+<Base>
+  <section class="hero wrap">
+    <h1 class="name">
+      <span>Kousuke</span>
+      <span>Shiba<i>.</i></span>
+    </h1>
+    <div class="hero-grid">
+      <div><span class="mono">Role</span><p>{profile.role}</p></div>
+      <div><span class="mono">School</span><p>{profile.school}<br />{profile.graduation}</p></div>
+      <div class="statement"><span class="mono">Statement</span><p>{profile.statement}</p></div>
+    </div>
+  </section>
+
+  <section id="works" class="wrap">
+    <div class="section-label"><h2>Works</h2><span class="mono">{pad(works.length)} items</span></div>
+
+    <div class="main-grid">
+      {
+        main.map((w) => (
+          <a class="card" href={`${base}works/${w.id}/`}>
+            <Cover src={w.data.cover} title={w.data.title} />
+            <div class="card-body">
+              <span class="mono num">{pad(w.data.order)}</span>
+              <div>
+                <h3>{w.data.title}</h3>
+                <p class="mono kind">{w.data.kind}</p>
+                <p class="summary">{w.data.summary}</p>
+              </div>
+              {w.data.award && <span class="award mono">Award</span>}
+            </div>
+          </a>
+        ))
+      }
+    </div>
+
+    <ul class="rows">
+      {
+        sub.map((w) => (
+          <li>
+            <a href={`${base}works/${w.id}/`}>
+              <span class="mono">{pad(w.data.order)}</span>
+              <strong>{w.data.title}</strong>
+              <span class="mono kind">{w.data.kind}</span>
+              <span class="summary">{w.data.summary}</span>
+              <span class="mono go">{w.data.status ?? '→'}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+
+    <h3 class="sub-head mono">Other</h3>
+    <ul class="others">
+      {
+        others.map((o) => (
+          <li>
+            <span class="mono">{o.year}</span>
+            {o.url ? <a href={o.url} target="_blank" rel="noopener">{o.title}↗</a> : <span>{o.title}</span>}
+            <span class="mono tech">{o.tech}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section id="about" class="wrap">
+    <div class="section-label"><h2>About</h2><span class="mono">{profile.name}</span></div>
+    <div class="about-grid">
+      <div class="cell skills">
+        {
+          skills.map((s) => (
+            <div class="skill-row">
+              <span class="mono">{s.label}</span>
+              <div>{s.items.map((i) => <span class="tag">{i}</span>)}</div>
+            </div>
+          ))
+        }
+      </div>
+      <div class="cell">
+        <span class="mono head">Awards</span>
+        <dl>{awards.map((a) => <><dt class="mono">{a.date}</dt><dd>{a.text}</dd></>)}</dl>
+        <span class="mono head">Certifications</span>
+        <dl>{certifications.map((a) => <><dt class="mono">{a.date}</dt><dd>{a.text}</dd></>)}</dl>
+        <span class="mono head">Hobby</span>
+        <p class="hobby">{hobbies.join(' / ')}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact wrap">
+    <a href={profile.github} target="_blank" rel="noopener">GitHub<span>↗</span></a>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    padding-top: clamp(40px, 8vw, 96px);
+  }
+  .name {
+    font-size: clamp(56px, 14vw, 210px);
+    line-height: 0.86;
+    letter-spacing: -0.055em;
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+  }
+  .name i {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.6fr;
+    border-top: var(--line);
+    margin-top: clamp(32px, 5vw, 56px);
+    margin-bottom: 96px;
+  }
+  .hero-grid > div {
+    padding: 10px 16px 0 0;
+  }
+  .hero-grid > div + div {
+    border-left: var(--hair);
+    padding-left: 16px;
+  }
+  .hero-grid p {
+    margin: 6px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .hero-grid .statement p {
+    font-size: clamp(18px, 2vw, 24px);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .hero-grid .mono {
+    color: var(--muted);
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: var(--line);
+    border-left: var(--line);
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    border-right: var(--line);
+    border-bottom: var(--line);
+    text-decoration: none;
+    background: var(--paper);
+  }
+  .card :global(.cover) {
+    border-bottom: var(--line);
+  }
+  .card-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    padding: 14px 16px 18px;
+    flex: 1;
+  }
+  .card h3 {
+    font-size: clamp(24px, 3vw, 36px);
+    letter-spacing: -0.02em;
+  }
+  .card .kind {
+    margin: 4px 0 0;
+    color: var(--muted);
+  }
+  .card .summary {
+    margin: 8px 0 0;
+    font-size: 14px;
+  }
+  .card:hover .card-body {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .card:hover .kind {
+    color: var(--accent);
+  }
+  .award {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+  }
+
+  .rows,
+  .others {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .rows {
+    margin-top: 48px;
+    border-top: var(--line);
+  }
+  .rows a {
+    display: grid;
+    grid-template-columns: 44px minmax(120px, 1.1fr) minmax(120px, 1fr) 2.4fr auto;
+    gap: 12px;
+    align-items: baseline;
+    padding: 14px 0;
+    border-bottom: var(--hair);
+    text-decoration: none;
+  }
+  .rows strong {
+    font-family: var(--font-sans);
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+  .rows .kind,
+  .rows .go {
+    color: var(--muted);
+  }
+  .rows .summary {
+    font-size: 14px;
+  }
+  .rows a:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+  .rows a:hover .kind,
+  .rows a:hover .go {
+    color: #fff;
+  }
+
+  .sub-head {
+    margin-top: 48px;
+    padding: 8px 0;
+    border-bottom: var(--line);
+    font-weight: 500;
+  }
+  .others li {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: var(--hair);
+    font-size: 14px;
+  }
+  .others .tech {
+    color: var(--muted);
+    text-transform: none;
+  }
+
+  #about {
+    margin-top: 120px;
+  }
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    border-top: var(--line);
+    border-left: var(--line);
+  }
+  .cell {
+    border-right: var(--line);
+    border-bottom: var(--line);
+    padding: 16px;
+    background: var(--paper);
+  }
+  .skill-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: var(--hair);
+  }
+  .skill-row:last-child {
+    border-bottom: 0;
+  }
+  .skill-row > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .head {
+    display: block;
+    color: var(--muted);
+  }
+  dl {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 2px 8px;
+    margin: 4px 0 20px;
+    font-size: 14px;
+  }
+  dd {
+    margin: 0;
+  }
+  .hobby {
+    margin: 4px 0 0;
+    font-size: 14px;
+  }
+
+  .contact {
+    margin-top: 120px;
+  }
+  .contact a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-top: var(--line);
+    border-bottom: var(--line);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: clamp(48px, 10vw, 140px);
+    letter-spacing: -0.05em;
+    line-height: 1.1;
+    text-decoration: none;
+  }
+  .contact a:hover {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .contact span {
+    color: var(--accent);
+  }
+
+  @media (max-width: 800px) {
+    .hero-grid,
+    .main-grid,
+    .about-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .hero-grid > div + div {
+      border-left: 0;
+      border-top: var(--hair);
+      padding: 10px 0 0;
+      margin-top: 10px;
+    }
+    .rows a {
+      grid-template-columns: 36px 1fr auto;
+    }
+    .rows .kind,
+    .rows .summary {
+      grid-column: 2 / -1;
+    }
+    .rows .go {
+      grid-column: 3;
+      grid-row: 1;
+      text-align: right;
+      max-width: 120px;
+    }
+    .others li {
+      grid-template-columns: 48px 1fr;
+    }
+    .others .tech {
+      grid-column: 2;
+    }
+  }
+</style>

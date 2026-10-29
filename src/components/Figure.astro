@@ -1,0 +1,41 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  src: ImageMetadata;
+  alt: string;
+  caption?: string;
+  maxHeight?: number;
+}
+
+const { src, alt, caption, maxHeight } = Astro.props;
+---
+
+<figure class="fig">
+  <Image
+    src={src}
+    alt={alt}
+    widths={[640, 1280, 1920]}
+    sizes="(max-width: 1100px) 100vw, 1100px"
+    style={maxHeight ? `max-height:${maxHeight}px;object-fit:contain` : undefined}
+  />
+  {caption && <figcaption class="mono">{caption}</figcaption>}
+</figure>
+
+<style>
+  .fig {
+    margin: 32px 0;
+    border: var(--line);
+    background: var(--ink);
+  }
+  .fig :global(img) {
+    width: 100%;
+  }
+  figcaption {
+    background: var(--bg);
+    border-top: var(--line);
+    padding: 6px 10px;
+    text-transform: none;
+  }
+</style>

@@ -1,0 +1,277 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Cover from '../../components/Cover.astro';
+
+export async function getStaticPaths() {
+  const works = (await getCollection('works')).sort((a, b) => a.data.order - b.data.order);
+  return works.map((work, i) => ({
+    params: { slug: work.id },
+    props: { work, next: works[(i + 1) % works.length] },
+  }));
+}
+
+const { work, next } = Astro.props;
+const { Content } = await render(work);
+const d = work.data;
+const base = import.meta.env.BASE_URL;
+
+const meta = [
+  ['Period', d.period],
+  ['Team', d.team],
+  ['Role', d.role],
+  ['Status', d.status],
+  ['Award', d.award],
+  ['AI', d.ai],
+].filter(([, v]) => v) as [string, string][];
+---
+
+<Base title={d.title} description={d.summary}>
+  <article>
+    <header class="head wrap">
+      <a class="mono back" href={`${base}#works`}>← Works</a>
+      <p class="mono kind">{String(d.order).padStart(2, '0')} / {d.kind}</p>
+      <h1>{d.title}</h1>
+      <p class="summary">{d.summary}</p>
+      {
+        d.goal && (
+          <p class="goal">
+            <span class="mono">Goal</span>
+            {d.goal}
+          </p>
+        )
+      }
+    </header>
+
+    <div class="meta wrap">
+      <dl>
+        {
+          meta.map(([k, v]) => (
+            <div class:list={{ hot: k === 'Award' }}>
+              <dt class="mono">{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))
+        }
+        <div class="wide">
+          <dt class="mono">Tech</dt>
+          <dd class="tags">{d.tech.map((t) => <span class="tag">{t}</span>)}</dd>
+        </div>
+        {
+          d.links.length > 0 && (
+            <div class="wide">
+              <dt class="mono">Link</dt>
+              <dd class="links">
+                {d.links.map((l) => (
+                  <a class="arrow-link" href={l.url} target="_blank" rel="noopener">
+                    {l.label}↗
+                  </a>
+                ))}
+              </dd>
+            </div>
+          )
+        }
+      </dl>
+    </div>
+
+    <div class="hero-img wrap">
+      <div class="frame"><Cover src={d.cover} title={d.title} sizes="100vw" /></div>
+    </div>
+
+    <div class="prose wrap">
+      <Content />
+    </div>
+
+    <nav class="next wrap">
+      <a href={`${base}works/${next.id}/`}>
+        <span class="mono">Next</span>
+        <strong>{next.data.title}</strong>
+        <span class="arrow">→</span>
+      </a>
+    </nav>
+  </article>
+</Base>
+
+<style>
+  .head {
+    padding-top: 24px;
+  }
+  .back {
+    text-decoration: none;
+  }
+  .back:hover {
+    color: var(--accent);
+  }
+  .kind {
+    margin: 40px 0 0;
+    color: var(--muted);
+  }
+  h1 {
+    font-size: clamp(48px, 10vw, 140px);
+    letter-spacing: -0.05em;
+    line-height: 0.95;
+    margin-top: 8px;
+  }
+  .summary {
+    font-size: clamp(16px, 1.6vw, 20px);
+    font-weight: 700;
+    margin: 20px 0 0;
+  }
+
+  .goal {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    margin: 20px 0 0;
+    padding: 12px 14px;
+    border: var(--line);
+    background: var(--paper);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .goal .mono {
+    flex-shrink: 0;
+    background: var(--accent);
+    color: #fff;
+    padding: 0 6px;
+  }
+  .meta dl {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: var(--line);
+    border-left: var(--hair);
+    margin: 32px 0 0;
+  }
+  .meta dl > div {
+    border-right: var(--hair);
+    border-bottom: var(--hair);
+    padding: 8px 12px 10px;
+  }
+  .meta .wide {
+    grid-column: span 2;
+  }
+  .meta .hot {
+    background: var(--accent);
+    color: #fff;
+  }
+  .meta .hot dt {
+    color: #fff;
+  }
+  dt {
+    color: var(--muted);
+  }
+  dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .tags,
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+  .tags {
+    gap: 6px;
+  }
+
+  .hero-img {
+    margin-top: 32px;
+  }
+  .frame {
+    border: var(--line);
+  }
+
+  .prose {
+    max-width: calc(760px + 2 * var(--gutter));
+    margin: 64px auto 0;
+  }
+  .prose :global(h2) {
+    counter-increment: sec;
+    font-size: clamp(22px, 2.6vw, 30px);
+    letter-spacing: -0.01em;
+    border-top: var(--line);
+    padding-top: 12px;
+    margin: 72px 0 16px;
+  }
+  .prose :global(h2::before) {
+    content: counter(sec, decimal-leading-zero);
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .prose :global(h2:first-child) {
+    margin-top: 0;
+  }
+  .prose :global(p),
+  :global(:where(.prose li)) {
+    font-size: 15px;
+  }
+  :global(:where(.prose ul)) {
+    padding-left: 1.2em;
+  }
+  .prose :global(li::marker) {
+    color: var(--accent);
+  }
+  .prose :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--paper);
+    border: var(--hair);
+    padding: 0 4px;
+  }
+  .prose :global(pre) {
+    border: var(--line);
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .prose :global(pre code) {
+    border: 0;
+    padding: 0;
+    background: none;
+  }
+  article {
+    counter-reset: sec;
+  }
+
+  .next {
+    margin-top: 120px;
+  }
+  .next a {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    border-top: var(--line);
+    border-bottom: var(--line);
+    padding: 12px 0;
+    text-decoration: none;
+  }
+  .next strong {
+    font-family: var(--font-sans);
+    font-size: clamp(36px, 7vw, 96px);
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  .next .arrow {
+    grid-row: 1 / 3;
+    grid-column: 2;
+    align-self: end;
+    font-size: clamp(36px, 7vw, 96px);
+    line-height: 1;
+    color: var(--accent);
+  }
+  .next a:hover {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  @media (max-width: 800px) {
+    .meta dl {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

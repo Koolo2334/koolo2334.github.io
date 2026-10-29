@@ -1,0 +1,265 @@
+---
+title: RaDX Engine
+kind: Game Engine
+summary: C++20 と DirectX 12 で制作したゲームエンジンとエディタです。
+goal: 理想のグラフィック表現を、描画を書き換えやすく、ゲームを作りやすい基盤の上で実現すること。
+tier: main
+order: 1
+period: 2026.03 – 現在（約800時間）
+team: 個人
+tech: [C++20 Modules, DirectX 12, HLSL, EnTT, Jolt Physics, XAudio2]
+links:
+  - { label: GitHub, url: "https://github.com/Koolo2334/RaDXEngine" }
+ai: エディタ UI・テスト・自動化スクリプトの実装、一部のコメントとコードの補完
+cover: ../../assets/works/radx/cover.png
+---
+import Figure from '../../components/Figure.astro';
+import Compare from '../../components/Compare.astro';
+import Gallery from '../../components/Gallery.astro';
+import Case from '../../components/Case.astro';
+import Flow from '../../components/Flow.astro';
+import Graph from '../../components/Graph.astro';
+import Profiler from '../../components/Profiler.astro';
+import Stat from '../../components/Stat.astro';
+import Bindless from '../../components/diagrams/Bindless.astro';
+import editor from '../../assets/works/radx/editor.png';
+import controlPanel from '../../assets/works/radx/control-panel.png';
+import materialEditor from '../../assets/works/radx/material-editor.png';
+import uiDesigner from '../../assets/works/radx/ui-designer.png';
+import curveEditor from '../../assets/works/radx/curve-editor.png';
+import physics from '../../assets/works/radx/physics.png';
+import lighting from '../../assets/works/radx/lighting.png';
+import motionblur from '../../assets/works/radx/motionblur.png';
+import ssaoOn from '../../assets/works/radx/ssao-on.png';
+import ssaoOff from '../../assets/works/radx/ssao-off.png';
+import taaOn from '../../assets/works/radx/taa-on.png';
+import taaOff from '../../assets/works/radx/taa-off.png';
+import shadowAtlas from '../../assets/works/radx/shadow-atlas.png';
+import profShadowBefore from '../../assets/works/radx/prof-shadow-before.png';
+import profShadowAfter from '../../assets/works/radx/prof-shadow-after.png';
+import profOptBefore from '../../assets/works/radx/prof-opt-before.png';
+import profOptAfter from '../../assets/works/radx/prof-opt-after.png';
+import gAlbedo from '../../assets/works/radx/gbuffer-albedo.png';
+import gNormal from '../../assets/works/radx/gbuffer-normal.png';
+import gDepth from '../../assets/works/radx/gbuffer-depth.png';
+import gMaterial from '../../assets/works/radx/gbuffer-material.png';
+import gVelocity from '../../assets/works/radx/gbuffer-velocity.png';
+import gEmissive from '../../assets/works/radx/gbuffer-emissive.png';
+
+## 作品紹介
+
+「グラフィックの力で、プレイヤーの興奮を最大化する」エンジニアを目指し、最新の API を用いた描画アーキテクチャを自分の手で設計するために制作しているゲームエンジンです。
+
+「柔軟性が高く、使いやすい」をコンセプトに、描画基盤からエディタ、ゲームの実行までを設計・実装しました。このエンジンでパズルゲーム「Luvia」も制作しています。
+
+<Figure src={editor} alt="RaDX Editor のレベルエディタ" caption="Unreal Engine を参考にしたレベルエディタ" />
+
+## 課題と解決
+
+<Case n="01" title="ゲームごとに異なる描画を、柔軟に組み替えたい">
+  <Fragment slot="problem">
+    求める描画はゲームによって異なります。パスを追加・変更するたびにリソースの寿命やバリアを手で管理する構成では、表現を試すたびに修正範囲が広がってしまいます。
+  </Fragment>
+
+  **RenderGraph** を採用しました。各パスが使うリソースを宣言するだけで、寿命の解析、メモリの重ね置き、バリアの挿入を自動で行います。パイプラインを変更せずに描画を差し込める `IRenderFeature` も用意しました。
+
+  <Flow
+    cols={[
+      { label: 'IRenderPipeline', items: ['Shadow', 'GBuffer', 'Lighting', { text: '+ IRenderFeature', sub: '外から描画を差し込む', hot: true }, 'Translucent', 'PostProcess'] },
+      { label: 'RenderGraph', items: [{ text: '寿命の解析', sub: 'いつ作り、いつ捨てるか' }, { text: 'メモリの重ね置き', sub: '寿命が重ならない資源で共有' }, { text: 'バリアの自動挿入', sub: '状態遷移を自動で記録' }] },
+      { label: 'GPU', items: ['CommandList'] },
+    ]}
+    arrows={['リソースを宣言', '実行']}
+    caption="Engine.Graphics.RenderGraph.ixx"
+  />
+
+  <Fragment slot="result">
+    描画パスの追加・入れ替えが容易になり、Luvia の光の表現もエンジン側を変更せずに実装できました。
+  </Fragment>
+</Case>
+
+<Case n="02" title="大量のテクスチャを扱う描画で、リソース管理が煩雑になった">
+  <Fragment slot="problem">
+    従来のディスクリプタ管理では、描画ごとにテーブルを用意して切り替える必要がありました。大量の SRV を動的に扱う複雑な描画を実装するにつれ、開発効率と処理効率の両方が悪化していました。
+  </Fragment>
+
+  **Bindless アーキテクチャ** を採用し、すべての SRV を単一の DescriptorTable に格納して、シェーダからインデックスで参照する形にしました。
+
+  <Bindless />
+
+  <Fragment slot="result">
+    テーブルの切り替えが不要になり、シェーダはインデックスを受け取るだけで任意のテクスチャを参照できるようになりました。
+  </Fragment>
+</Case>
+
+<Case n="03" title="PBR と NPR を、1つのパイプラインで共存させたい">
+  <Fragment slot="problem">
+    マテリアルごとにシェーダを個別に書く方式では、描画パスが増えるほど組み合わせの管理が難しくなります。
+  </Fragment>
+
+  **動的シェーダコンパイル** を実装しました。マテリアル固有の HLSLI を各描画パスのシェーダへ自動で展開し、ライティングはシェーディングモデルの ID で切り替えます。ビルド時には全順列を事前コンパイルします。
+
+  <Graph
+    cols={[
+      { label: 'マテリアル', items: ['OneColor.hlsli', 'StandardPBR.hlsli'] },
+      { label: '描画パス', items: ['GBufferBase.hlsl', 'TranslucentBase.hlsl'] },
+    ]}
+    edges={[[[0, 0], [0, 1], [1, 0], [1, 1]]]}
+    edgeLabels={['自動 include']}
+    caption="各マテリアルを、すべての描画パスへ自動 include して展開（Engine.Graphics.ShaderCompiler.ixx）"
+  />
+
+  <Graph
+    cols={[
+      { label: 'シェーディングモデル', items: ['StandardPBR_Lighting.hlsli', 'Unlit_Lighting.hlsli'] },
+      { label: '統合', items: [{ text: 'ID で紐づけ', sub: 'ID ごとに分岐を生成', hot: true }] },
+      { label: 'ライティング', items: ['DeferredLighting.hlsl', 'TranslucentBase.hlsl'] },
+    ]}
+    edges={[[[0, 0], [1, 0]], [[0, 0], [0, 1]]]}
+    caption="シェーディングモデルを統合して各ライティングへ（Engine.Graphics.Pipeline.ixx MergePipelineDesc()）"
+  />
+
+  <Fragment slot="result">
+    HLSLI を登録するだけでシェーディングモデルを追加でき、キャラクター用の前方描画と合わせて PBR と NPR を共存させました。
+  </Fragment>
+</Case>
+
+<Case n="04" title="目標性能を大きく下回った">
+  <Fragment slot="problem">
+    パフォーマンスターゲットを「RTX 3060 Laptop で 60 FPS」と定めていましたが、描画パスを増やした結果、デモシーンが 20 FPS まで低下しました。
+  </Fragment>
+
+  プロファイラでボトルネックを特定し、大きく2つの最適化を行いました。
+
+  **① シャドウマップのラウンドロビン更新**　複数光源を扱うため、シャドウアトラスと DirectionalLight のカスケードシャドウを実装していました。すべての影を毎フレーム更新するのをやめ、距離に応じて更新頻度を下げ、描画するフレームを分散しました。
+
+  <Figure src={shadowAtlas} alt="シャドウアトラス" caption="シャドウアトラス（CascadeShadow / AtlasLarge / AtlasMedium / AtlasSmall）" maxHeight={320} />
+
+  <Profiler
+    before={{ src: profShadowBefore, ms: '26 ms', span: 36.56 }}
+    after={{ src: profShadowAfter, ms: '5 ms', span: 15.341 }}
+    delta="21 ms 削減（シャドウ描画）"
+  />
+
+  **② 事前計算とカリング**　行列やバウンディングボックスを事前に計算し、カリングを最適化しました。
+
+  <Profiler
+    before={{ src: profOptBefore, ms: '41 ms', span: 41.43 }}
+    after={{ src: profOptAfter, ms: '12 ms', span: 11.936 }}
+    delta="71% 削減（フレーム全体）"
+  />
+
+  <Fragment slot="result">
+    <Stat from="20" to="80+" unit="FPS" note="目標の 60 FPS を上回りました（RTX 3060 Laptop）。" />
+  </Fragment>
+</Case>
+
+<Case n="05" title="ビルドと再起動の待ち時間が、ゲーム制作の妨げになった">
+  <Fragment slot="problem">
+    コードを変更するたびにビルドとエディタの再起動が必要で、試行錯誤のテンポが落ちていました。
+  </Fragment>
+
+  C++20 の **Modules** を採用してコンパイル時間を短縮しました。さらにエンジンを1つの DLL にまとめ、ゲームのコードを別の DLL に分けることで、エディタを開いたままゲームの DLL を差し替える **ホットリロード** を実装しました。
+
+  <Flow
+    cols={[
+      { label: '実行ファイル', items: [{ text: 'RaDXEditor.exe', sub: 'エディタ' }, { text: 'RaDXGame.exe', sub: 'ゲームの起動' }] },
+      { label: 'GameEngine.dll', items: [{ text: 'Core・ECS / Graphics / Renderer / Physics / Audio / Input / UI / Assets', sub: '全14分野・209モジュール' }] },
+      { label: 'ゲームのコード', items: [{ text: 'MyGame.dll', sub: 'エディタを開いたまま差し替え', hot: true }] },
+    ]}
+    arrows={['読み込み', '読み込み']}
+    caption="Engine.Core.GameModule.ixx、App.Editor.HotReload.ixx"
+  />
+
+  <Fragment slot="result">
+    エディタを閉じずに C++ の変更を反映できるようになりました。一方で、一部のライブラリでは Modules との相性による不具合も多く、導入の利点と欠点の両方を経験しました。
+  </Fragment>
+</Case>
+
+<Case n="06" title="TAA の履歴バッファが上書きされた">
+  <Fragment slot="problem">
+    TAA で前フレームの結果を次フレームへ受け渡す際、RenderGraph のメモリ最適化によってバッファが再利用され、テクスチャが上書きされることがありました。
+  </Fragment>
+
+  履歴バッファの作成時に再利用を禁止する設定を追加し、フレームをまたいだ安全な受け渡しを実現しました。
+
+  <Flow
+    cols={[
+      { label: 'Frame N-1', items: ['TAA の出力'] },
+      { label: 'History Buffer', items: [{ text: '再利用を禁止', sub: 'RenderGraph の重ね置きの対象外', hot: true }] },
+      { label: 'Frame N', items: ['前フレームと合成'] },
+    ]}
+    arrows={['保持', '参照']}
+    caption="Engine.Renderer.Passes.TAAPass.ixx"
+  />
+
+  <Compare a={{ src: taaOff, label: 'TAA OFF' }} b={{ src: taaOn, label: 'TAA ON' }} />
+</Case>
+
+<Case n="07" title="機能が増えるほど、変更による不具合に気づきにくくなった">
+  <Fragment slot="problem">
+    エンジン・エディタ・描画の各機能が増え、手作業での確認では変更の影響を把握しきれなくなりました。
+  </Fragment>
+
+  1つのコマンドで、ビルドから全シーンの巡回までを実行できるようにしました。描画は WARP で撮影した画像を基準画像と比較し、GPU の差に左右されずに意図しない変化を検出します。
+
+  <Flow
+    cols={[
+      { items: [{ text: 'Build', sub: 'エンジンと確認用ゲーム' }, { text: 'StaticCheck', sub: 'ENGINE_API の付け忘れ' }] },
+      { items: [{ text: 'EditorTests', sub: '自己テスト 128件' }, { text: 'EngineTests', sub: '自己テスト 201件' }] },
+      { items: [{ text: 'SceneTour', sub: '全シーンを開いて確認' }, { text: 'LogCheck', sub: 'D3D12 の警告も検査', hot: true }] },
+    ]}
+    arrows={['', '']}
+    caption="Scripts/run_tests.ps1、Scripts/image_regress.py"
+  />
+
+  <Fragment slot="result">
+    変更による不具合をすぐに発見できるようになり、安心して機能を追加できる状態を保っています。
+  </Fragment>
+</Case>
+
+## 描画パイプライン
+
+上記の基盤を使い、デファードレンダーパイプラインを制作しました。
+
+`SceneUpload → Shadow → LightUpload → GBuffer → SSAO → Lighting → Translucent → TAA → PostProcess`
+
+<Gallery cols={3} items={[
+  { src: gAlbedo, caption: 'Albedo' },
+  { src: gNormal, caption: 'Normal' },
+  { src: gDepth, caption: 'Depth' },
+  { src: gMaterial, caption: 'Material' },
+  { src: gVelocity, caption: 'Velocity' },
+  { src: gEmissive, caption: 'Emissive' },
+]} />
+
+<Figure src={lighting} alt="ライティング結果" caption="多光源デファードライティング（クラスタへのライト割り当て、PCSS + SSCS）" />
+
+<Compare a={{ src: ssaoOff, label: 'SSAO OFF' }} b={{ src: ssaoOn, label: 'SSAO ON' }} caption="法線を用いた半球サンプリング SSAO。IGN とバイラテラルブラーでノイズを除去" />
+
+<Figure src={motionblur} alt="Motion Blur と Bloom" caption="Motion Blur、Bloom、ACES トーンマッピング、自動露出" />
+
+## エディタとゲーム制作
+
+アセットの種類ごとに専用のエディタを用意し、マテリアルはノードを繋ぐだけでシェーダが生成されます。
+
+<Gallery items={[
+  { src: materialEditor, caption: 'マテリアルエディタ' },
+  { src: uiDesigner, caption: 'UI デザイナー' },
+  { src: curveEditor, caption: 'カーブエディタ' },
+  { src: controlPanel, caption: 'コントロールパネル' },
+]} />
+
+ゲームのコードは EnTT による ECS で記述します。コンポーネントの宣言の下にマクロを書くだけでリフレクションに登録され、保存・詳細パネル・Undo などのエンジン機能をそのまま利用できます。
+
+```cpp
+struct FirstPersonComponent {
+    float WalkSpeed = 4.5f;
+    float JumpSpeed = 5.0f;
+};
+RADX_COMPONENT(FirstPersonComponent, "FirstPerson",
+    RADX_FIELD(WalkSpeed).Range(0.0f, 20.0f),
+    RADX_FIELD(JumpSpeed).Range(0.0f, 20.0f));
+```
+
+<Figure src={physics} alt="Physics シーン" caption="Jolt Physics を組み込み、コンポーネントを付けるだけで剛体や当たり判定を利用可能" />

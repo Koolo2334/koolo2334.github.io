@@ -1,0 +1,97 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Capture {
+  src: ImageMetadata;
+  ms: string;
+  span: number;
+}
+
+interface Props {
+  before: Capture;
+  after: Capture;
+  delta: string;
+  caption?: string;
+}
+
+const { before, after, delta, caption } = Astro.props;
+const afterWidth = (after.span / before.span) * 100;
+---
+
+<figure class="prof">
+  <div class="row">
+    <div class="meta"><span class="mono">Before</span><strong>{before.ms}</strong></div>
+    <div class="strip"><Image src={before.src} alt={`最適化前 ${before.ms}`} widths={[800, 1600]} sizes="700px" /></div>
+  </div>
+  <div class="delta mono">↓ {delta}</div>
+  <div class="row">
+    <div class="meta"><span class="mono">After</span><strong class="hot">{after.ms}</strong></div>
+    <div class="strip"><div style={`width:${afterWidth}%`}><Image src={after.src} alt={`最適化後 ${after.ms}`} widths={[800, 1600]} sizes="700px" /></div></div>
+  </div>
+  <figcaption class="mono">{caption ?? 'GPU プロファイラのキャプチャ。横幅を同じ時間軸に揃えて表示'}</figcaption>
+</figure>
+
+<style>
+  .prof {
+    margin: 24px 0;
+    border: var(--line);
+    background: var(--bg);
+    padding: 16px 16px 0;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+  .meta span {
+    display: block;
+    color: var(--muted);
+  }
+  .meta strong {
+    font-family: var(--font-sans);
+    font-size: 26px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .meta .hot {
+    color: var(--accent);
+  }
+  .strip {
+    border: var(--hair);
+    background: #f3f3f3;
+  }
+  .strip > div {
+    border-right: 2px solid var(--accent);
+  }
+  .strip :global(img) {
+    width: 100%;
+  }
+  .delta {
+    margin: 6px 0 6px 96px;
+    color: var(--accent);
+    font-weight: 500;
+    text-transform: none;
+  }
+  figcaption {
+    margin: 16px -16px 0;
+    border-top: var(--line);
+    padding: 6px 10px;
+    text-transform: none;
+  }
+  @media (max-width: 560px) {
+    .row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
+    }
+    .meta {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .delta {
+      margin-left: 0;
+    }
+  }
+</style>

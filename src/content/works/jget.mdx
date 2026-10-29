@@ -1,0 +1,86 @@
+---
+title: Jget
+kind: 2D Shooter
+summary: 倒した敵から落ちる玉をバウンスさせ続ける、縦スクロールシューティングです。
+goal: 自分が最高に楽しめる、独自性のあるゲームをつくること。
+tier: sub
+order: 6
+period: 2024.10（2週間、約50時間）
+team: 個人
+role: プログラム、グラフィック、BGM・SE
+tech: [Unity, C#]
+links:
+  - { label: unityroom, url: "https://unityroom.com/games/jget" }
+cover: ../../assets/works/jget/cover.png
+---
+import Gallery from '../../components/Gallery.astro';
+import Case from '../../components/Case.astro';
+import Flow from '../../components/Flow.astro';
+import design from '../../assets/works/jget/design.png';
+import sound from '../../assets/works/jget/sound.png';
+
+## 作品紹介
+
+Unity で制作した、初めての個人作品です。unityroom で公開しており、ランキング機能を活用したスコアアタックも実装しました。
+
+## 課題と解決
+
+<Case n="01" title="古典的なシューティングに、独自の楽しさを加えたい">
+  <Fragment slot="problem">
+    規則的に現れる敵を倒してスコアを稼ぐだけでは、既存のゲームとの差別化ができません。
+  </Fragment>
+
+  敵を倒すと玉が生まれて落下し、それを自機でバウンスさせ続けるとスコアが上がるシステムを追加しました。
+
+  <Flow
+    cols={[
+      { items: ['敵を倒す'] },
+      { items: ['玉が生まれて落ちる'] },
+      { items: ['自機でバウンス'] },
+      { items: [{ text: 'スコアが上がる', sub: '続けるほど玉が増える', hot: true }] },
+    ]}
+  />
+
+  <Fragment slot="result">
+    攻撃しながら玉を拾う忙しい操作と、大量の玉が跳ねる賑やかな画面が生まれ、目標としていた楽しさと独自性を実現できました。
+  </Fragment>
+</Case>
+
+<Case n="02" title="ステージの編集とデータ管理に手間がかかる">
+  <Fragment slot="problem">
+    プログラムだけでステージを制御していたため、編集に手間がかかり、複数のステージを作るとデータの管理が難しくなりました。
+  </Fragment>
+
+  敵のステータスと行動パターンを ScriptableObject で管理し、パラメータをソースコードの外に出しました。敵の行動をウェーブに区切り、それを組み合わせてステージを作る構成にしています。
+
+  <Flow
+    cols={[
+      { label: 'EnemyData', items: ['HP', '出現時間', '移動パターン'] },
+      { label: 'WaveData', items: ['Enemy 1', 'Enemy 2', 'Enemy 3'] },
+      { label: 'StageData', items: ['Wave 1', 'Wave 2', 'Wave 3'] },
+    ]}
+    arrows={['組み合わせ', '組み合わせ']}
+    caption="Scripts/EnemyDatabase.cs、Scripts/EnemyWaveDatabase.cs（ScriptableObject）"
+  />
+
+  <Fragment slot="result">
+    レベルデザインの効率が大きく向上し、行動パターンの使い回しやエンドレスモードも実現できました。
+  </Fragment>
+</Case>
+
+<Case n="03" title="1人の制作でも、見た目と音に妥協したくない">
+  <Fragment slot="problem">
+    素材を外部に頼ると、ゲーム全体の統一感が損なわれます。
+  </Fragment>
+
+  スプライト・効果音・BGM をすべて自作しました。説明がなくても分かる機能的なデザインを意識し、役割ごとに色を統一し、敵の HP を形状で表しています。
+
+  <Gallery items={[
+    { src: design, caption: 'スプライト制作' },
+    { src: sound, caption: 'BGM 制作' },
+  ]} />
+
+  <Fragment slot="result">
+    グラフィックと音まで自分の意図で統一でき、ルールを説明しなくても伝わる画面になりました。
+  </Fragment>
+</Case>

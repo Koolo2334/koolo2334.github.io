@@ -1,0 +1,157 @@
+---
+// 任意形状のポリゴンをドットに分解する様子の図。
+// セル中心がポリゴン内ならドット、4近傍のどれかが外ならエッジドットとして色分けする。
+const CELL = 20;
+const W = 480;
+const H = 260;
+const poly: [number, number][] = [
+  [30, 250],
+  [30, 150],
+  [190, 50],
+  [330, 70],
+  [450, 180],
+  [450, 250],
+];
+
+const inside = (x: number, y: number) => {
+  let hit = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+};
+
+const cells: { x: number; y: number; edge: boolean }[] = [];
+for (let y = CELL / 2; y < H; y += CELL) {
+  for (let x = CELL / 2; x < W; x += CELL) {
+    if (!inside(x, y)) continue;
+    const edge = [
+      [-CELL, 0],
+      [CELL, 0],
+      [0, -CELL],
+      [0, CELL],
+    ].some(([dx, dy]) => !inside(x + dx, y + dy));
+    cells.push({ x, y, edge });
+  }
+}
+
+// 輪郭の各辺の中点から、外向きの法線を矢印で示す
+const normals = poly
+  .map((p, i) => [p, poly[(i + 1) % poly.length]] as const)
+  .map(([a, b]) => {
+    const mx = (a[0] + b[0]) / 2;
+    const my = (a[1] + b[1]) / 2;
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy);
+    // 時計回りの頂点列なので (dy, -dx) が外向き
+    return { x: mx, y: my, nx: dy / len, ny: -dx / len };
+  })
+  .filter((n) => n.ny < 0.9);
+const points = poly.map((p) => p.join(',')).join(' ');
+---
+
+<figure class="dotedge">
+  <svg viewBox={`-10 0 ${W + 20} ${H + 10}`} role="img" aria-label="ポリゴンをドットに分解し、輪郭のドットの法線を外向きに傾ける図">
+    <defs>
+      <marker id="dotedge-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" class="head" />
+      </marker>
+    </defs>
+    {
+      cells.map((c) => (
+        <rect x={c.x - CELL / 2} y={c.y - CELL / 2} width={CELL} height={CELL} class={c.edge ? 'edge' : 'fill'} />
+      ))
+    }
+    <polygon points={points} class="outline" />
+    {
+      normals.map((n) => (
+        <line x1={n.x} y1={n.y} x2={n.x + n.nx * 34} y2={n.y + n.ny * 34} class="normal" marker-end="url(#dotedge-head)" />
+      ))
+    }
+  </svg>
+  <ul class="legend mono">
+    <li><i class="fill"></i>内側のドット：正面向きの法線</li>
+    <li><i class="edge"></i>輪郭のドット：最も近い辺の法線で外側へ傾ける</li>
+    <li><i class="line"></i>元のポリゴン（破壊で形が変わる）</li>
+  </ul>
+  <figcaption class="mono">ドットのグリッドはオブジェクト空間に固定（DotGenerator.compute）</figcaption>
+</figure>
+
+<style>
+  .dotedge {
+    margin: 24px 0;
+    border: var(--line);
+    background: var(--bg);
+  }
+  svg {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 16px 16px 0;
+  }
+  .fill {
+    fill: var(--paper);
+    stroke: var(--ink);
+    stroke-width: 0.6;
+  }
+  .edge {
+    fill: var(--accent);
+    stroke: var(--ink);
+    stroke-width: 0.6;
+  }
+  .outline {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+  }
+  .normal {
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .head {
+    fill: var(--ink);
+  }
+  .legend {
+    list-style: none;
+    margin: 0;
+    padding: 10px 16px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    font-size: 11px;
+    text-transform: none;
+  }
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend i {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--ink);
+  }
+  .legend i.fill {
+    background: var(--paper);
+  }
+  .legend i.edge {
+    background: var(--accent);
+  }
+  .legend i.line {
+    border: 0;
+    border-top: 2px dashed var(--ink);
+    height: 0;
+    width: 16px;
+  }
+  figcaption {
+    border-top: var(--line);
+    padding: 6px 10px;
+    text-transform: none;
+  }
+</style>

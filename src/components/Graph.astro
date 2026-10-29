@@ -1,0 +1,266 @@
+---
+// ノードの列を並べ、隣り合う列のノード同士を矢印で結ぶ図。
+// edges[i] は 列 i → 列 i+1 の接続を [元の行, 先の行] で並べたもの。
+// 矢印は描画後のノード位置を測って SVG で引く（線の角度と矢じりの向きを一致させるため）。
+// 狭い幅では列を上から下へ並べ、矢印も縦向きに引く。
+type Item = string | { text: string; sub?: string; hot?: boolean };
+
+interface Col {
+  label?: string;
+  items: Item[];
+}
+
+interface Props {
+  cols: Col[];
+  edges: [number, number][][];
+  edgeLabels?: string[];
+  caption?: string;
+}
+
+const { cols, edges, edgeLabels = [], caption } = Astro.props;
+const norm = (it: Item) => (typeof it === 'string' ? { text: it } : it);
+const breakable = (s: string) => s.split(/(?<=[._/])/);
+const hasLabels = cols.some((c) => c.label) || edgeLabels.some(Boolean);
+// ラベル付きの矢印だけ幅を広げ、隣の列見出しと詰まらないようにする
+const template = cols
+  .map((_, i) => (i === 0 ? '' : edgeLabels[i - 1] ? 'var(--gap-label) ' : 'var(--gap) ') + 'minmax(0, 1fr)')
+  .join(' ');
+const wires = edges.flatMap((pairs, i) => pairs.map(([from, to]) => [i, from, i + 1, to]));
+---
+
+<figure class="graph">
+  <div class="track" style={`grid-template-columns:${template}`} data-wires={JSON.stringify(wires)}>
+    {
+      cols.map((col, c) => (
+        <>
+          {c > 0 && (
+            <div class="gap">
+              {hasLabels && <span class="mono elabel">{edgeLabels[c - 1] ?? ''}</span>}
+            </div>
+          )}
+          <div class="col">
+            {hasLabels && <span class="mono clabel">{col.label ?? ''}</span>}
+            <div class="stack">
+              {col.items.map(norm).map((it, r) => (
+                <div class="cell">
+                  <div class:list={['node', { hot: it.hot }]} data-node={`${c}-${r}`}>
+                    {breakable(it.text).map((part) => <>{part}<wbr /></>)}
+                    {it.sub && <small>{it.sub}</small>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ))
+    }
+    <svg class="wires" aria-hidden="true"></svg>
+  </div>
+  {caption && <figcaption class="mono">{caption}</figcaption>}
+</figure>
+
+<script>
+  const NS = 'http://www.w3.org/2000/svg';
+  const GAP = 8; // ノードと矢印の間の余白
+  const SPREAD = 16; // 同じ辺から複数の矢印が出入りするときの間隔
+  const HEAD = { len: 10, half: 5 };
+
+  type Box = { l: number; r: number; t: number; b: number; w: number; h: number; cx: number; cy: number };
+
+  // 1つの辺に集まる端点を、相手側の高さ順に上から等間隔に振り分ける
+  function spread(keys: number[], other: (k: number) => number, center: number, size: number, out: Map<number, number>) {
+    const step = Math.min(SPREAD, size / (keys.length + 1));
+    [...keys]
+      .sort((a, b) => other(a) - other(b))
+      .forEach((k, i) => out.set(k, center + (i - (keys.length - 1) / 2) * step));
+  }
+
+  function draw(track: HTMLElement) {
+    const svg = track.querySelector<SVGSVGElement>('svg.wires')!;
+    const base = track.getBoundingClientRect();
+    const box = (id: string): Box => {
+      const r = track.querySelector(`[data-node="${id}"]`)!.getBoundingClientRect();
+      const l = r.left - base.left, t = r.top - base.top;
+      return { l, r: l + r.width, t, b: t + r.height, w: r.width, h: r.height, cx: l + r.width / 2, cy: t + r.height / 2 };
+    };
+    const wires: number[][] = JSON.parse(track.dataset.wires ?? '[]');
+    const ends = wires.map(([c0, r0, c1, r1]) => ({ src: `${c0}-${r0}`, dst: `${c1}-${r1}` }));
+    const boxes = new Map(ends.flatMap((e) => [e.src, e.dst]).map((id) => [id, box(id)]));
+    // 縦並びのときは、辺に沿う方向（横）に端点を振り分ける
+    const vertical = getComputedStyle(track).flexDirection === 'column' && getComputedStyle(track).display === 'flex';
+    const along = (b: Box) => (vertical ? b.cx : b.cy);
+    const size = (b: Box) => (vertical ? b.w : b.h);
+
+    const y1s = new Map<number, number>();
+    const y2s = new Map<number, number>();
+    for (const [side, out, other] of [
+      ['src', y1s, (k: number) => along(boxes.get(ends[k].dst)!)],
+      ['dst', y2s, (k: number) => along(boxes.get(ends[k].src)!)],
+    ] as const) {
+      const groups = new Map<string, number[]>();
+      ends.forEach((e, k) => groups.set(e[side], [...(groups.get(e[side]) ?? []), k]));
+      groups.forEach((keys, id) => spread(keys, other, along(boxes.get(id)!), size(boxes.get(id)!), out));
+    }
+
+    svg.setAttribute('width', String(base.width));
+    svg.setAttribute('height', String(base.height));
+    svg.replaceChildren();
+    ends.forEach((e, k) => {
+      const a = boxes.get(e.src)!, b = boxes.get(e.dst)!;
+      const [x1, y1] = vertical ? [y1s.get(k)!, a.b + GAP] : [a.r + GAP, y1s.get(k)!];
+      const [x2, y2] = vertical ? [y2s.get(k)!, b.t - GAP] : [b.l - GAP, y2s.get(k)!];
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+      // 線は矢じりの根元で止める
+      const bx = x2 - ux * HEAD.len, by = y2 - uy * HEAD.len;
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', String(x1));
+      line.setAttribute('y1', String(y1));
+      line.setAttribute('x2', String(bx));
+      line.setAttribute('y2', String(by));
+      const head = document.createElementNS(NS, 'polygon');
+      const points = [
+        [x2, y2],
+        [bx - uy * HEAD.half, by + ux * HEAD.half],
+        [bx + uy * HEAD.half, by - ux * HEAD.half],
+      ];
+      head.setAttribute('points', points.map((p) => p.join(',')).join(' '));
+      svg.append(line, head);
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('.graph .track').forEach((track) => {
+    new ResizeObserver(() => draw(track)).observe(track);
+    document.fonts?.ready.then(() => draw(track));
+  });
+</script>
+
+<style>
+  .graph {
+    margin: 24px 0;
+    border: var(--line);
+    background: var(--bg);
+  }
+  .track {
+    --gap: 96px;
+    --gap-label: 128px;
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    padding: 16px;
+  }
+  /* 列見出しの行と本体の行を全列で揃える */
+  .col,
+  .gap {
+    grid-row: 1 / 3;
+    display: grid;
+    grid-template-rows: subgrid;
+    row-gap: 4px;
+  }
+  .col > .stack:first-child {
+    grid-row: 1 / 3;
+  }
+  .wires {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .wires :global(line) {
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .wires :global(polygon) {
+    fill: var(--ink);
+  }
+  .clabel,
+  .elabel {
+    font-size: 11px;
+    line-height: 1.3;
+    text-transform: none;
+    align-self: end;
+  }
+  .clabel {
+    color: var(--muted);
+  }
+  .elabel {
+    text-align: center;
+    white-space: nowrap;
+    color: var(--accent);
+  }
+  .stack {
+    display: grid;
+    grid-auto-rows: 1fr;
+  }
+  .cell {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+  }
+  .node {
+    width: 100%;
+    min-width: 0;
+    border: var(--line);
+    background: var(--paper);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 6px 8px;
+    overflow-wrap: anywhere;
+  }
+  .node small {
+    display: block;
+    font-family: var(--font-jp);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .node.hot {
+    background: var(--accent);
+    color: #fff;
+  }
+  .node.hot small {
+    color: #fff;
+  }
+  figcaption {
+    border-top: var(--line);
+    padding: 6px 10px;
+    text-transform: none;
+  }
+  @media (max-width: 640px) {
+    .track {
+      display: flex;
+      flex-direction: column;
+      padding: 12px 10px;
+    }
+    .col,
+    .gap {
+      display: block;
+    }
+    .gap {
+      height: 36px;
+    }
+    .clabel {
+      display: block;
+      margin-bottom: 2px;
+    }
+    /* 列の中のノードは横に並べる */
+    .stack {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      grid-auto-rows: auto;
+      column-gap: 10px;
+    }
+    .cell {
+      padding: 0;
+      align-items: stretch;
+    }
+    /* 狭い幅では矢印ラベルを省き、内容はキャプションで補う */
+    .elabel {
+      display: none;
+    }
+    .node {
+      font-size: 11px;
+      padding: 4px 5px;
+    }
+  }
+</style>

@@ -1,0 +1,131 @@
+---
+title: Luvia
+kind: 3D Puzzle
+summary: 光で壁と床が反転するダンジョンを探索するパズルゲームです。
+goal: 光による視覚効果とゲームシステムを融合させ、美しく奥深いパズル体験をつくること。
+tier: main
+order: 2
+period: 2026.09（1か月、約100時間）
+team: 個人（3D モデルは配布素材）
+tech: [RaDX Engine, C++20, HLSL]
+links:
+  - { label: GitHub, url: "https://github.com/Koolo2334/Luvia" }
+ai: ゲームの全コードの実装
+cover: ../../assets/works/luvia/cover.png
+---
+import Figure from '../../components/Figure.astro';
+import Compare from '../../components/Compare.astro';
+import Case from '../../components/Case.astro';
+import Flow from '../../components/Flow.astro';
+import Graph from '../../components/Graph.astro';
+import ring from '../../assets/works/luvia/ring.png';
+import wallDark from '../../assets/works/luvia/wall-dark.png';
+import wallLit from '../../assets/works/luvia/wall-lit.png';
+import floorDark from '../../assets/works/luvia/floor-dark.png';
+import floorLit from '../../assets/works/luvia/floor-lit.png';
+import editor from '../../assets/works/luvia/editor.png';
+
+## 作品紹介
+
+自作のゲームエンジン「RaDX Engine」で制作したパズルゲームです。宝玉の光が届く範囲では、壁はすり抜けられるようになり、床は穴になって進めなくなります。宝玉は1つしか持てないため、どの台座に置くかを考え、光の当たる場所を組み替えながらゴールを目指します。
+
+<Compare a={{ src: wallDark, label: '壁：通れない' }} b={{ src: wallLit, label: '光：すり抜けられる' }} />
+<Compare a={{ src: floorDark, label: '床：歩ける' }} b={{ src: floorLit, label: '光：穴になる' }} />
+
+## 課題と解決
+
+<Case n="01" title="見た目とゲームの判定がずれると、直感的に遊べない">
+  <Fragment slot="problem">
+    光で地形が変わるルールでは、「光って見える場所」と「実際に通れる場所」が一致していなければ、プレイヤーは理不尽さを感じてしまいます。
+  </Fragment>
+
+  判定と描画を分けて設計し、両者の結果を一致させました。判定は CPU で簡易的に行い、見た目は GPU で宝玉ごとの深度キューブを使って描画しています。
+
+  <Graph
+    cols={[
+      { items: ['宝玉の光'] },
+      {
+        items: [
+          { text: '判定（CPU）', sub: 'ボクセル分割 → 3D DDA → Möller–Trumbore 交差' },
+          { text: '描画（GPU）', sub: '宝玉ごとの深度キューブで遮蔽を判定' },
+        ],
+      },
+      { items: ['壁・床の当たり判定を切り替え', '光の範囲をくり抜き、縁を描画'] },
+      { items: [{ text: '見た目と判定が一致', hot: true }] },
+    ]}
+    edges={[[[0, 0], [0, 1]], [[0, 0], [1, 1]], [[0, 0], [1, 0]]]}
+    caption="App.Luminous.Optics.ixx、App.Luminous.OrbOcclusionFeature.ixx、Shaders/Materials/PhaseWall.hlsli"
+  />
+
+  <Figure src={ring} alt="光の輪郭" caption="球面のくり抜きと光の縁" />
+
+  <Fragment slot="result">
+    光の縁がそのまま通行可否の境界になり、説明がなくても見たままに遊べる表現になりました。
+  </Fragment>
+</Case>
+
+<Case n="02" title="光の描画を、エンジンの汎用性を損なわずに追加したい">
+  <Fragment slot="problem">
+    ゲーム固有の描画のためにエンジンのパイプラインを書き換えると、エンジンが特定のゲームに依存してしまいます。
+  </Fragment>
+
+  追加の描画はすべてエンジンの `IRenderFeature` で差し込み、パイプライン自体は変更していません。宝玉の遮蔽を求めるパスは、シャドウの直後に追加しています。深度キューブは動いた宝玉の面だけを更新し、負荷を抑えました。
+
+  <Flow
+    cols={[
+      { label: 'Luvia（ゲーム側）', items: ['OrbOcclusionFeature', 'AddFeature() で登録'] },
+      {
+        label: 'エンジンのパイプライン（変更なし）',
+        items: ['Shadows', { text: 'OrbOcclusionPass', sub: '宝玉ごとの深度キューブ', hot: true }, '以降のパス（GBuffer・Lighting など）'],
+      },
+    ]}
+    arrows={['AfterShadows に追加']}
+    caption="App.Luminous.OrbOcclusionFeature.ixx AddPasses()"
+  />
+
+  <Fragment slot="result">
+    エンジンをゲームから独立させたまま、ゲーム固有の光の表現を追加できました。
+  </Fragment>
+</Case>
+
+<Case n="03" title="地形が変わることで、プレイヤーが詰んでしまう">
+  <Fragment slot="problem">
+    光が消えて壁が戻ったときに体が埋まる、足元の床が突然消える、といった状況が起こり得ました。
+  </Fragment>
+
+  壁に埋まった場合は押し出し、床が消えた場合は最寄りの足場へ滑らせる処理を入れました。また、敵・制限時間・落下をなくし、論理と空間把握だけで解けるパズルにしました。
+
+  <Graph
+    cols={[
+      { label: '起こり得る状況', items: ['光が消えて壁が戻り、体が埋まる', '足元の床が突然穴になる'] },
+      { label: '対処', items: ['壁の外へ押し出す', '最寄りの足場へ滑らせる'] },
+    ]}
+    edges={[[[0, 0], [1, 1]]]}
+  />
+
+  <Fragment slot="result">
+    地形が変わってもプレイヤーが詰まず、パズルを解くことだけに集中できるようになりました。
+  </Fragment>
+</Case>
+
+<Case n="04" title="遊ぶだけでなく、ステージを作る楽しさも提供したい">
+  <Fragment slot="problem">
+    用意したステージを遊び終えると、体験が終わってしまいます。
+  </Fragment>
+
+  ゲーム内にステージエディタを実装しました。床・壁・台座をペイントツールのように配置でき、階層の追加・入れ替え、Undo/Redo、その場でのテストプレイに対応しています。保存したステージはステージセレクトから遊べます。
+
+  <Flow
+    cols={[
+      { label: '作る', items: ['床・壁・台座をペイント', '階層の追加・入れ替え', 'Undo / Redo'] },
+      { label: '試す', items: ['その場でテストプレイ'] },
+      { label: '遊ぶ', items: [{ text: 'ステージセレクトから遊べる', hot: true }] },
+    ]}
+  />
+
+  <Figure src={editor} alt="ステージエディタ" caption="ゲーム内ステージエディタ" />
+
+  <Fragment slot="result">
+    プレイヤー自身がダンジョンを作って遊べるようになり、用意したステージを遊び終えたあとも楽しめる作品になりました。
+  </Fragment>
+</Case>

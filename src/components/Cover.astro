@@ -1,0 +1,48 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  src?: ImageMetadata;
+  title: string;
+  sizes?: string;
+}
+
+const { src, title, sizes = '(max-width: 800px) 100vw, 50vw' } = Astro.props;
+---
+
+{
+  src ? (
+    <Image class="cover" src={src} alt={title} widths={[640, 1280, 1920]} sizes={sizes} />
+  ) : (
+    <div class="cover placeholder" aria-hidden="true">
+      <span>{title}</span>
+    </div>
+  )
+}
+
+<style>
+  .cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: var(--ink);
+  }
+  .placeholder {
+    display: grid;
+    place-items: end start;
+    padding: 16px;
+    color: var(--bg);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 23px, #2a2a2a 23px 24px),
+      repeating-linear-gradient(0deg, transparent 0 23px, #2a2a2a 23px 24px),
+      var(--ink);
+  }
+  .placeholder span {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: clamp(32px, 6vw, 72px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+</style>

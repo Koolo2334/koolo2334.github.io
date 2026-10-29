@@ -1,0 +1,55 @@
+---
+interface Props {
+  from: string;
+  to: string;
+  unit?: string;
+  note?: string;
+}
+
+const { from, to, unit = '', note } = Astro.props;
+---
+
+<div class="stat">
+  <span class="from">{from}<small>{unit}</small></span>
+  <span class="arrow" aria-hidden="true">→</span>
+  <span class="to">{to}<small>{unit}</small></span>
+  {note && <span class="note">{note}</span>}
+</div>
+
+<style>
+  .stat {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 14px;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .from {
+    font-size: clamp(28px, 4vw, 40px);
+    text-decoration: line-through;
+    text-decoration-thickness: 3px;
+    opacity: 0.75;
+  }
+  .to {
+    font-size: clamp(44px, 7vw, 72px);
+  }
+  small {
+    font-size: 0.4em;
+    margin-left: 4px;
+    letter-spacing: 0;
+  }
+  .arrow {
+    font-size: 32px;
+  }
+  .note {
+    flex-basis: 100%;
+    font-family: var(--font-jp);
+    font-size: 14px;
+    letter-spacing: 0;
+    line-height: 1.6;
+    margin-top: 8px;
+  }
+</style>

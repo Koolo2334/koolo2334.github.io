@@ -1,0 +1,141 @@
+---
+title: ハコボット
+kind: 3D Puzzle / Team
+summary: ブロックを積んで3方向のシルエットを合わせる、12人で制作したパズルゲームです。
+goal: チームの全員が連携して、遊びと手触りを追求できる環境をつくること。
+tier: main
+order: 3
+period: 2025.10 – 2026.01（約500時間）
+team: 12人（プログラマ7・プランナー2・デザイナー3）
+role: パズルロジック、レベルエディタ、シャドウ・アウトライン描画、ブロック透明化、チュートリアル、BGM・SE
+tech: [C++, DirectX 11, HLSL]
+award: 進級制作展（HAL EVENT WEEK）金賞
+links:
+  - { label: Web, url: "https://hew209.github.io/HakoBotWeb/" }
+cover: ../../assets/works/hakobot/cover.png
+---
+import Figure from '../../components/Figure.astro';
+import Compare from '../../components/Compare.astro';
+import Gallery from '../../components/Gallery.astro';
+import Case from '../../components/Case.astro';
+import Flow from '../../components/Flow.astro';
+import Graph from '../../components/Graph.astro';
+import HakoGrid from '../../components/diagrams/HakoGrid.astro';
+import game from '../../assets/works/hakobot/game.png';
+import stageEditor from '../../assets/works/hakobot/stage-editor.png';
+import blockEditor from '../../assets/works/hakobot/block-editor.png';
+import outline from '../../assets/works/hakobot/outline.png';
+import tOff from '../../assets/works/hakobot/translucent-off.png';
+import tOn from '../../assets/works/hakobot/translucent-on.png';
+
+## 作品紹介
+
+DirectX 11 で制作した、ブロックを3次元のグリッドに置いて、3方向のシルエットをお題に合わせるパズルゲームです。チーム制作のプログラマとして、パズルの基本ロジック、開発効率を高めるレベルエディタ、アウトラインなどのグラフィックスを主に担当しました。
+
+<Figure src={game} alt="ハコボットのゲーム画面" />
+
+## 課題と解決
+
+<Case n="01" title="設置・撤去のたびに、シルエットを効率よく計算したい">
+  <Fragment slot="problem">
+    ブロックを置くたびに3方向のシルエットを再計算するため、グリッドの持ち方によっては計算量が大きくなります。
+  </Fragment>
+
+  設置したブロックの情報を配列に保存し、グリッドにはブロックのインデックスだけを格納する構造にしました。3次元グリッドには多次元配列クラスを、座標にはベクタークラスを自作して使用しています。
+
+  <HakoGrid />
+
+  <Fragment slot="result">
+    設置・撤去・シルエット計算を少ない計算量で行えるようにしました。
+  </Fragment>
+</Case>
+
+<Case n="02" title="ステージ制作に時間がかかり、調整の回数を確保できない">
+  <Fragment slot="problem">
+    ブロック形状やクリア条件をコードやデータで直接編集する方法では、プランナーが試行錯誤できる回数が限られてしまいます。
+  </Fragment>
+
+  レベルエディタを制作しました。BlockEditor ではブロックの形状をモデルと照らし合わせながら編集でき、StageEditor ではブロックを登録して3方向のクリア条件を設定できます。編集中のステージを別ウィンドウでそのままテストプレイすることも可能です。
+
+  <Flow
+    cols={[
+      { label: 'BlockEditor', items: ['モデルを見ながら形状を編集'] },
+      { label: 'StageEditor', items: ['ブロックを登録', '3方向のクリア条件を設定'] },
+      { label: 'テストプレイ', items: [{ text: '別ウィンドウでそのまま確認', hot: true }] },
+    ]}
+  />
+
+  <Gallery items={[
+    { src: stageEditor, caption: 'StageEditor' },
+    { src: blockEditor, caption: 'BlockEditor' },
+  ]} />
+
+  <Fragment slot="result">
+    ステージ制作を素早く直感的に行えるようになり、遊びの調整に多くの時間を充てられました。
+  </Fragment>
+</Case>
+
+<Case n="03" title="どのブロックを持てるのかが分かりにくい">
+  <Fragment slot="problem">
+    プレイヤーが操作できるブロックを、複雑な形状でも正確に示す必要がありました。
+  </Fragment>
+
+  ジオメトリシェーダでひとまわり大きいメッシュを生成し、元のメッシュを描画したあと、大きいメッシュをステンシルでマスクして描画する方式でアウトラインを実装しました。
+
+  <Flow
+    cols={[
+      { label: '1', items: ['元のメッシュを描画', 'ステンシルに書き込む'] },
+      { label: '2', items: ['ジオメトリシェーダで', 'ひとまわり大きいメッシュを生成'] },
+      { label: '3', items: [{ text: 'ステンシルでマスクして描画', sub: 'はみ出した部分だけが輪郭になる', hot: true }] },
+    ]}
+    caption="HakoBot/Source/OutlineMeshRenderer.cpp"
+  />
+
+  <Figure src={outline} alt="アウトライン" caption="ブロックのアウトライン" />
+
+  <Fragment slot="result">
+    複雑な形状のブロックにも、正確なアウトラインを付けられるようになりました。
+  </Fragment>
+</Case>
+
+<Case n="04" title="置いたブロックで、正解のシルエットが隠れてしまう">
+  <Fragment slot="problem">
+    ブロックを置くとお題のスクリーンが隠れ、正解の形状が見えなくなってプレイの支障になっていました。さらに、透明化したブロック同士が重なると視認性が悪化しました。
+  </Fragment>
+
+  ブロックの透明化切り替えを実装し、重なった透明ブロックは専用の深度バッファを使って最も手前の面だけを描画する仕組みにしました。
+
+  <Flow
+    cols={[
+      { label: '1', items: ['透明ブロックの深度だけを', '専用の深度バッファに描画'] },
+      { label: '2', items: [{ text: '最も手前の面と一致する', sub: '面だけを半透明で描画', hot: true }] },
+    ]}
+  />
+
+  <Compare a={{ src: tOff, label: '透明化 OFF' }} b={{ src: tOn, label: '透明化 ON' }} />
+
+  <Fragment slot="result">
+    ブロックを置いたままでもお題のシルエットを確認でき、透明ブロックが重なっても見やすさを保てました。
+  </Fragment>
+</Case>
+
+<Case n="05" title="職種の違うメンバー間で、認識がずれる">
+  <Fragment slot="problem">
+    企画・アート・プログラムでは使う言葉や前提が異なり、要望が正しく伝わらないことがありました。
+  </Fragment>
+
+  企画やアート担当の要望をすぐに実装して試せる状態を保ちました。また、グラフィックスの知識を活かしてアートとプログラマの間に入り、互いに分かりやすい言葉に置き換えて頻繁に認識を擦り合わせました。
+
+  <Graph
+    cols={[
+      { label: '要望', items: ['企画', 'アート'] },
+      { label: '自分', items: [{ text: 'すぐに実装して試せる状態に', hot: true }, '互いの言葉に置き換えて共有'] },
+      { label: 'チーム', items: ['試行錯誤の回数が増える'] },
+    ]}
+    edges={[[[0, 0], [0, 1], [1, 0], [1, 1]], [[0, 0], [1, 0]]]}
+  />
+
+  <Fragment slot="result">
+    試行錯誤と修正に多くの時間を割けるようになり、ゲームの作り込みに大きく貢献できました。
+  </Fragment>
+</Case>

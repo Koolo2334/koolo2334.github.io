@@ -1,0 +1,110 @@
+---
+import Arrow from './Arrow.astro';
+
+type Item = string | { text: string; sub?: string; hot?: boolean };
+
+interface Col {
+  label?: string;
+  items: Item[];
+}
+
+interface Props {
+  cols: Col[];
+  arrows?: string[];
+  caption?: string;
+}
+
+const { cols, arrows = [], caption } = Astro.props;
+const norm = (it: Item) => (typeof it === 'string' ? { text: it } : it);
+const breakable = (s: string) => s.split(/(?<=[._/])/);
+---
+
+<figure class="flow">
+  <div class="track">
+    {
+      cols.map((col, i) => (
+        <>
+          {i > 0 && <Arrow label={arrows[i - 1]} />}
+          <div class="col">
+            {col.label && <div class="mono head">{col.label}</div>}
+            <ul>
+              {col.items.map(norm).map((it) => (
+                <li class:list={{ hot: it.hot }}>
+                  {breakable(it.text).map((part) => <>{part}<wbr /></>)}
+                  {it.sub && <small>{it.sub}</small>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      ))
+    }
+  </div>
+  {caption && <figcaption class="mono">{caption}</figcaption>}
+</figure>
+
+<style>
+  .flow {
+    margin: 24px 0;
+    border: var(--line);
+    background: var(--bg);
+  }
+  .track {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 20px 16px;
+  }
+  .col {
+    flex: 1 1 0;
+    min-width: 0;
+    border: var(--line);
+    background: var(--paper);
+  }
+  .head {
+    background: var(--ink);
+    color: var(--bg);
+    padding: 3px 8px;
+    text-transform: none;
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  li {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 5px 8px;
+    border-top: var(--hair);
+    overflow-wrap: break-word;
+  }
+  li:first-child {
+    border-top: 0;
+  }
+  li small {
+    display: block;
+    font-family: var(--font-jp);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  li.hot {
+    background: var(--accent);
+    color: #fff;
+  }
+  li.hot small {
+    color: #fff;
+  }
+  figcaption {
+    border-top: var(--line);
+    padding: 6px 10px;
+    text-transform: none;
+  }
+  @media (max-width: 640px) {
+    .track {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+</style>

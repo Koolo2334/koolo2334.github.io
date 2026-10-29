@@ -1,0 +1,129 @@
+---
+title: ガンラット
+kind: 2D Action / Team
+summary: 自由な形の地形をドット絵として描画し、3D のライティングを当てた、チーム制作の 2D アクションゲームです。
+goal: 形が変わる地形をドット絵のまま美しく描き、2D でも立体感のある絵作りを実現すること。
+tier: main
+order: 4
+period: 2026.03 – 2026.09
+team: 約10人
+role: 地形のドット絵化描画・ライティング、ステージ開始・終了演出
+tech: [Unity, C#, HLSL, Compute Shader, URP]
+cover: ../../assets/works/gunrat/cover.png
+---
+import Figure from '../../components/Figure.astro';
+import Compare from '../../components/Compare.astro';
+import Case from '../../components/Case.astro';
+import Flow from '../../components/Flow.astro';
+import Graph from '../../components/Graph.astro';
+import DotEdge from '../../components/diagrams/DotEdge.astro';
+import TerrainLayers from '../../components/diagrams/TerrainLayers.astro';
+import rot0 from '../../assets/works/gunrat/rot0.png';
+import rot25 from '../../assets/works/gunrat/rot25.png';
+import baseTerrain from '../../assets/works/gunrat/base-terrain.png';
+
+## 作品紹介
+
+Unity で制作した、地形を壊しながら進む 2D アクションゲームです。描画の担当として、自由な形の地形をドット絵として描き、URP の 3D ライティングで照らす仕組みを実装しました。あわせて、Timeline を使ったステージの開始・終了演出も制作しています。
+
+## 課題と解決
+
+<Case n="01" title="自由な形の地形を、回転してもドット絵のまま描きたい">
+  <Fragment slot="problem">
+    地形は自由な形のポリゴンで、破壊されると形が変わります。斜めの辺や破壊後の断面までドットで描き、さらにオブジェクトが回転したときは、ドットも一緒に回転する「オブジェクト空間のドット絵」にする必要がありました。テクスチャを粗くするだけでは輪郭が滑らかなまま残り、画面上でドットに丸めると回転のたびに絵が崩れてしまいます。
+  </Fragment>
+
+  コンピュートシェーダで、オブジェクト空間に固定したグリッドのセルごとに、中心がポリゴンの三角形の内側にあるかを判定し、内側ならドットを生成します。UV は三角形の重心座標から補間し、生成したドットは GPU インスタンシングで描画します。オブジェクトの移動や回転は、頂点シェーダでローカルからワールドへの行列を掛けて反映するため、ドットの並びはオブジェクトに対して変わりません。
+
+  <Flow
+    cols={[
+      { label: 'ポリゴン', items: ['頂点・三角形・UV', '輪郭の辺'] },
+      { label: 'Compute Shader', items: ['セル中心の内外判定', '重心座標で UV を補間', '4 近傍から輪郭を判定'] },
+      { label: 'ドット', items: ['位置（オブジェクト空間）', 'UV・法線・輪郭フラグ'] },
+      { label: '描画', items: ['DrawMeshInstancedIndirect', { text: 'ローカル → ワールド行列', hot: true }] },
+    ]}
+    arrows={['', 'Append', '']}
+    caption="DotGenerator.compute、MeshDotRendererA.cs、DotInstancedPBR.shader"
+  />
+
+  <Compare a={{ src: rot0, label: '回転 0°' }} b={{ src: rot25, label: '回転 25°：ドットも回転' }} />
+
+  <Fragment slot="result">
+    斜めの辺も破壊後の断面もドットで描かれ、回転してもドット絵として崩れない地形を実現しました。
+  </Fragment>
+</Case>
+
+<Case n="02" title="2D でも、厚みを感じる 3D ライティングを当てたい">
+  <Fragment slot="problem">
+    ドットを平面に並べただけでは、光を当てても板のように見えてしまいます。キャラクターや背景と同じ光源で、地形にも立体的な陰影を付ける必要がありました。
+  </Fragment>
+
+  ドット用のシェーダから URP 標準のライティング関数（`UniversalFragmentPBR`）を呼び出し、メインライト・追加ライト・影・反射プローブに対応させました。元のマテリアルにノーマルマップがあれば自動で引き継ぎます。
+
+  さらに、輪郭のドットは最も近い辺の法線を外向きに揃え、外側へ斜めに傾けた法線で上書きしています。縁に陰影が付くことで、地形に厚みが生まれます。
+
+  <DotEdge />
+
+  <Fragment slot="result">
+    URP の光源をそのまま使って、ドット絵の地形を厚みのある岩のように照らせるようになりました。
+  </Fragment>
+</Case>
+
+<Case n="03" title="テクスチャだけでなく、自由なマテリアルで地形を表現したい">
+  <Fragment slot="problem">
+    ドット絵化はテクスチャをドットごとにサンプリングする仕組みのため、Shader Graph によるプロシージャルなテクスチャやアニメーションするマテリアルは、そのままでは使えませんでした。
+  </Fragment>
+
+  地形の設定（ScriptableObject）には、元になるマテリアルを指定するだけにしました。テクスチャだけのマテリアルはそのテクスチャを直接使い、Shader Graph などのカスタムマテリアルは RenderTexture へオフスクリーン描画してから、ドットとしてサンプリングします。時間で変化するマテリアルは毎フレーム描き直します。
+
+  <Graph
+    cols={[
+      { label: '元のマテリアル', items: ['テクスチャのみ', 'Shader Graph・アニメーション'] },
+      { label: '取得', items: ['テクスチャをそのまま使用', { text: 'オフスクリーン描画', sub: 'RenderTexture・ポイントフィルタ', hot: true }] },
+      { label: 'ドット', items: ['UV でサンプリング'] },
+    ]}
+    edges={[[[0, 0], [1, 1]], [[0, 0], [1, 0]]]}
+    caption="TerrainParameterA.cs GetEffectiveTexture()"
+  />
+
+  <Fragment slot="result">
+    普段どおりに作ったマテリアルがそのままドット絵の地形に反映され、プロシージャル生成やアニメーションを含む自由度の高い表現が可能になりました。
+  </Fragment>
+</Case>
+
+<Case n="04" title="ドット化の処理負荷が、地形の数に比例して増える">
+  <Fragment slot="problem">
+    当初は、すべての地形で毎フレームコンピュートシェーダを動かしてドットを生成していたため、地形が増えるほど負荷が増えていました。
+  </Fragment>
+
+  画面外の地形で生成を止める方法や、マネージャで生成と描画を一括処理する構成も試しました。しかし毎フレーム生成すること自体が負荷の原因だったため、最終的には地形の描画を作り直し、ドットをオブジェクト空間で一度だけ生成する方式にしました。生成し直すのは破壊などで形が変わったときだけで、毎フレームの処理は行列を渡して描画するだけです。
+
+  <Flow
+    cols={[
+      { label: '当初', items: ['全地形で毎フレーム生成'] },
+      { label: '試行', items: ['画面外は生成を停止', 'マネージャで一括処理'] },
+      { label: '最終', items: [{ text: '形が変わったときだけ生成', sub: '移動・回転は行列で反映', hot: true }] },
+    ]}
+    caption="最終版：Scripts/Terrain/new/MeshDotRendererA.cs、TerrainShape.cs"
+  />
+
+  <Fragment slot="result">
+    動いている地形や回転する地形が多くても、ドットの生成は形が変わる瞬間だけで済むようになりました。
+  </Fragment>
+</Case>
+
+<Case n="05" title="常に映るベース地形には、より作り込んだ表現が必要だった">
+  <Fragment slot="problem">
+    破壊できないベース地形は、常に動かずに画面に映り、ステージの印象を大きく左右します。美しい絵作りのために、破壊できる地形よりも複雑で柔軟な表現が求められました。
+  </Fragment>
+
+  ベース地形専用のレンダラーとシェーダを作りました。各ドットに外周までの距離を持たせ、距離の範囲ごとに最大4層のレイヤーを重ねます。レイヤーの境界はグレースケールの閾値テクスチャで不規則に崩し、ランプテクスチャをソフトライトで合成して、外周からの距離に応じた色の変化を付けています。レイヤーごとにマテリアル・ノーマルマップ・PBR の設定を持てます。
+
+  <TerrainLayers />
+
+  <Figure src={baseTerrain} alt="ベース地形の外周" caption="実際のベース地形：外周付近のレイヤーと、斜めの辺のドット" />
+
+  <Fragment slot="result">
+    1つのシェーダで、外周の縁取りや地層のような境界など、幅広い表現をパラメータの組み合わせだけで作れるようになりました。
+  </Fragment>
+</Case>
