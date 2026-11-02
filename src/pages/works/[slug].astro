@@ -31,7 +31,7 @@ const meta = [
     <header class="head wrap">
       <a class="mono back" href={`${base}#works`}>← Works</a>
       <p class="mono kind">{String(d.order).padStart(2, '0')} / {d.kind}</p>
-      <h1>{d.title}</h1>
+      <h1 class:list={{ long: d.title.length > 8 }}>{d.title}</h1>
       <p class="summary">{d.summary}</p>
       {
         d.goal && (
@@ -111,6 +111,10 @@ const meta = [
     letter-spacing: -0.05em;
     line-height: 0.95;
     margin-top: 8px;
+  }
+  /* 長いタイトルは1行に収まるよう小さくする */
+  h1.long {
+    font-size: clamp(28px, 7vw, 100px);
   }
   .summary {
     font-size: clamp(16px, 1.6vw, 20px);
